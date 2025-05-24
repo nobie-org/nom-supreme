@@ -11,7 +11,7 @@ use indent_write::fmt::IndentWriter;
 use joinery::JoinableIterator;
 use nom::{
     error::{ErrorKind as NomErrorKind, FromExternalError, ParseError},
-    ErrorConvert, InputLength,
+    ErrorConvert, Input,
 };
 
 use crate::{
@@ -493,7 +493,7 @@ impl<I: Display + Debug, T: Debug, C: Debug, E: Display + Debug> Error
 {
 }
 
-impl<I: InputLength, T, C, E> ParseError<I> for GenericErrorTree<I, T, C, E> {
+impl<I: Input, T, C, E> ParseError<I> for GenericErrorTree<I, T, C, E> {
     /// Create a new error at the given position. Interpret `kind` as an
     /// [`Expectation`] if possible, to give a more informative error message.
     fn from_error_kind(location: I, kind: NomErrorKind) -> Self {
@@ -666,16 +666,15 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use nom::{
         bits::{bits, complete::take},
-        sequence::tuple,
         IResult, Parser,
     };
 
     type BitInput<'a> = (&'a [u8], usize);
 
-    fn parse_bool_bit(input: (&[u8], usize)) -> IResult<BitInput, bool, ErrorTree<BitInput>> {
+    // Use nom's basic Error type for bit parsing
+    fn parse_bool_bit(input: BitInput) -> IResult<BitInput, bool, nom::error::Error<BitInput>> {
         take(1usize).map(|bit: u8| bit != 0).parse(input)
     }
 
@@ -683,17 +682,29 @@ mod tests {
 
     /// Parse 8 bits
     fn parse_bits(input: &[u8]) -> IResult<&[u8], Byte, ErrorTree<&[u8]>> {
-        bits(tuple((
-            parse_bool_bit,
-            parse_bool_bit,
-            parse_bool_bit,
-            parse_bool_bit,
-            parse_bool_bit,
-            parse_bool_bit,
-            parse_bool_bit,
-            parse_bool_bit,
-        )))
+        // Use nom's Error type for bit parsing, then convert the error after
+        match bits::<_, _, nom::error::Error<BitInput>, nom::error::Error<&[u8]>, _>(|input| {
+            let (input, b0) = parse_bool_bit(input)?;
+            let (input, b1) = parse_bool_bit(input)?;
+            let (input, b2) = parse_bool_bit(input)?;
+            let (input, b3) = parse_bool_bit(input)?;
+            let (input, b4) = parse_bool_bit(input)?;
+            let (input, b5) = parse_bool_bit(input)?;
+            let (input, b6) = parse_bool_bit(input)?;
+            let (input, b7) = parse_bool_bit(input)?;
+            Ok((input, (b0, b1, b2, b3, b4, b5, b6, b7)))
+        })
         .parse(input)
+        {
+            Ok(result) => Ok(result),
+            Err(nom::Err::Error(e)) => {
+                Err(nom::Err::Error(ErrorTree::from_error_kind(e.input, e.code)))
+            }
+            Err(nom::Err::Failure(e)) => Err(nom::Err::Failure(ErrorTree::from_error_kind(
+                e.input, e.code,
+            ))),
+            Err(nom::Err::Incomplete(n)) => Err(nom::Err::Incomplete(n)),
+        }
     }
 
     /// Test that ErrorTree can be used with a bits parser, which requires
@@ -702,7 +713,6 @@ mod tests {
     fn error_tree_bits() {
         let values = [0b1010_1111, 10];
         let (tail, result) = parse_bits(&values).unwrap();
-
         assert_eq!(tail, &[10]);
         assert_eq!(result, (true, false, true, false, true, true, true, true));
     }

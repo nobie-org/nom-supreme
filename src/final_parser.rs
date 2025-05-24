@@ -4,10 +4,10 @@ use core::fmt::{self, Display, Formatter};
 
 use nom::{
     error::{Error, ErrorKind, ParseError},
-    Err as NomErr, InputLength, Offset, Parser,
+    Err as NomErr, Input, Offset, Parser,
 };
 
-use nom::error::VerboseError;
+use nom_language::error::VerboseError;
 
 use crate::parser_ext::ParserExt;
 
@@ -226,10 +226,12 @@ where
 /// as errors. Additionally, if the parser returns an error, the context
 /// information in the error is recombined with the original input via
 /// `ExtractContext` to create a more useful error.
-pub fn final_parser<I, O, E, E2>(parser: impl Parser<I, O, E>) -> impl FnMut(I) -> Result<O, E2>
+pub fn final_parser<I, O, E, E2>(
+    parser: impl Parser<I, Output = O, Error = E>,
+) -> impl FnMut(I) -> Result<O, E2>
 where
     E: ParseError<I> + ExtractContext<I, E2>,
-    I: InputLength + Clone,
+    I: Input + Clone,
 {
     let mut parser = parser.complete().all_consuming();
 

@@ -4,7 +4,8 @@
 //! arbitrary types of data to be attached as context to errors, rather than
 //! requiring `&'static str`.
 
-use nom::error::{Error, ErrorKind, VerboseError, VerboseErrorKind};
+use nom::error::{Error, ErrorKind};
+use nom_language::error::{VerboseError, VerboseErrorKind};
 
 /// Updated version of [`nom::error::ContextError`]. Allows for arbitrary
 /// context types, rather than requiring `&'static str`

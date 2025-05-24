@@ -5,9 +5,9 @@
 //! specific tag that was expected. This allows the error message to report
 //! something like `Expected tag: "true"` instead of just `Error: Tag`.
 
-use nom::error::{Error, ErrorKind};
+use nom::error::{Error, ErrorKind, ParseError};
 
-use nom::error::{ParseError, VerboseError};
+use nom_language::error::VerboseError;
 
 /// Similar to [`FromExternalError`][nom::error::FromExternalError] and
 /// [`ContextError`][crate::context::ContextError], this trait allows a parser
@@ -48,7 +48,7 @@ impl<I, T> TagError<I, T> for VerboseError<I> {
 
 /// Complete input version of enhanced `tag` parsers
 pub mod complete {
-    use nom::{Compare, CompareResult, Err, IResult, InputLength, InputTake};
+    use nom::{Compare, CompareResult, Err, IResult, Input};
 
     use super::TagError;
 
@@ -92,8 +92,8 @@ pub mod complete {
     /// ```
     pub fn tag<T, I, E>(tag: T) -> impl Clone + Fn(I) -> IResult<I, I, E>
     where
-        T: InputLength + Clone,
-        I: InputTake + Compare<T>,
+        T: Input + Clone,
+        I: Input + Compare<T>,
         E: TagError<I, T>,
     {
         let tag_len = tag.input_len();
@@ -144,8 +144,8 @@ pub mod complete {
     /// ```
     pub fn tag_no_case<T, I, E>(tag: T) -> impl Clone + Fn(I) -> IResult<I, I, E>
     where
-        T: InputLength + Clone,
-        I: InputTake + Compare<T>,
+        T: Input + Clone,
+        I: Input + Compare<T>,
         E: TagError<I, T>,
     {
         move |input: I| match input.compare_no_case(tag.clone()) {
@@ -157,7 +157,7 @@ pub mod complete {
 
 /// Streaming version of enhanced `tag` parsers.
 pub mod streaming {
-    use nom::{Compare, CompareResult, Err, IResult, InputLength, InputTake, Needed};
+    use nom::{Compare, CompareResult, Err, IResult, Input, Needed};
 
     use super::TagError;
 
@@ -199,8 +199,8 @@ pub mod streaming {
     /// ```
     pub fn tag<T, I, E>(tag: T) -> impl Clone + Fn(I) -> IResult<I, I, E>
     where
-        T: InputLength + Clone,
-        I: InputLength + InputTake + Compare<T>,
+        T: Input + Clone,
+        I: Input + Compare<T>,
         E: TagError<I, T>,
     {
         let tag_len = tag.input_len();
@@ -252,8 +252,8 @@ pub mod streaming {
     /// ```
     pub fn tag_no_case<T, I, E>(tag: T) -> impl Clone + Fn(I) -> IResult<I, I, E>
     where
-        T: InputLength + Clone,
-        I: InputLength + InputTake + Compare<T>,
+        T: Input + Clone,
+        I: Input + Compare<T>,
         E: TagError<I, T>,
     {
         let tag_len = tag.input_len();

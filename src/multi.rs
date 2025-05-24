@@ -47,7 +47,7 @@ use core::{convert::Infallible, iter};
 use nom::{
     error::{ErrorKind::SeparatedNonEmptyList, FromExternalError, ParseError},
     Err::Error,
-    InputLength, Parser,
+    Input, Parser,
 };
 
 /**
@@ -103,21 +103,14 @@ assert_eq!(vec, [1, 2, -3, 4]);
 
 [module]: crate::multi
 */
-pub fn collect_separated_terminated<
-    Input,
-    ParseOutput,
-    SepOutput,
-    TermOutput,
-    ParseErr,
-    Collection,
->(
-    parser: impl Parser<Input, ParseOutput, ParseErr>,
-    separator: impl Parser<Input, SepOutput, ParseErr>,
-    terminator: impl Parser<Input, TermOutput, ParseErr>,
-) -> impl Parser<Input, Collection, ParseErr>
+pub fn collect_separated_terminated<I, ParseOutput, SepOutput, TermOutput, ParseErr, Collection>(
+    parser: impl Parser<I, Output = ParseOutput, Error = ParseErr>,
+    separator: impl Parser<I, Output = SepOutput, Error = ParseErr>,
+    terminator: impl Parser<I, Output = TermOutput, Error = ParseErr>,
+) -> impl Parser<I, Output = Collection, Error = ParseErr>
 where
-    Input: Clone + InputLength,
-    ParseErr: ParseError<Input>,
+    I: Clone + Input,
+    ParseErr: ParseError<I>,
     Collection: Default + Extend<ParseOutput>,
 {
     parse_separated_terminated(
@@ -142,17 +135,17 @@ of how this parser parses a sequence.
 [module]: crate::multi
 */
 #[inline]
-pub fn parse_separated_terminated<Input, ParseOutput, SepOutput, TermOutput, ParseErr, Accum>(
-    parser: impl Parser<Input, ParseOutput, ParseErr>,
-    separator: impl Parser<Input, SepOutput, ParseErr>,
-    terminator: impl Parser<Input, TermOutput, ParseErr>,
+pub fn parse_separated_terminated<I, ParseOutput, SepOutput, TermOutput, ParseErr, Accum>(
+    parser: impl Parser<I, Output = ParseOutput, Error = ParseErr>,
+    separator: impl Parser<I, Output = SepOutput, Error = ParseErr>,
+    terminator: impl Parser<I, Output = TermOutput, Error = ParseErr>,
 
     init: impl FnMut() -> Accum,
     mut fold: impl FnMut(Accum, ParseOutput) -> Accum,
-) -> impl Parser<Input, Accum, ParseErr>
+) -> impl Parser<I, Output = Accum, Error = ParseErr>
 where
-    Input: Clone + InputLength,
-    ParseErr: ParseError<Input>,
+    I: Clone + Input,
+    ParseErr: ParseError<I>,
 {
     parse_separated_terminated_impl(
         parser,
@@ -174,7 +167,7 @@ documentation for more details about the precise behavior of this parser.
 */
 #[inline]
 pub fn parse_separated_terminated_res<
-    Input,
+    I,
     ParseOutput,
     SepOutput,
     TermOutput,
@@ -182,16 +175,16 @@ pub fn parse_separated_terminated_res<
     Accum,
     FoldErr,
 >(
-    parser: impl Parser<Input, ParseOutput, ParseErr>,
-    separator: impl Parser<Input, SepOutput, ParseErr>,
-    terminator: impl Parser<Input, TermOutput, ParseErr>,
+    parser: impl Parser<I, Output = ParseOutput, Error = ParseErr>,
+    separator: impl Parser<I, Output = SepOutput, Error = ParseErr>,
+    terminator: impl Parser<I, Output = TermOutput, Error = ParseErr>,
 
     init: impl FnMut() -> Accum,
     fold: impl FnMut(Accum, ParseOutput) -> Result<Accum, FoldErr>,
-) -> impl Parser<Input, Accum, ParseErr>
+) -> impl Parser<I, Output = Accum, Error = ParseErr>
 where
-    Input: Clone + InputLength,
-    ParseErr: ParseError<Input> + FromExternalError<Input, FoldErr>,
+    I: Clone + Input,
+    ParseErr: ParseError<I> + FromExternalError<I, FoldErr>,
 {
     parse_separated_terminated_impl(parser, separator, terminator, init, fold, |input, err| {
         ParseErr::from_external_error(input, SeparatedNonEmptyList, err)
@@ -225,7 +218,7 @@ impl<E> ZeroLengthParseState<E> {
 /// unnecessary bound of FromExternalError on parse_separated_terminated.
 #[inline]
 fn parse_separated_terminated_impl<
-    Input,
+    I,
     ParseOutput,
     SepOutput,
     TermOutput,
@@ -233,20 +226,20 @@ fn parse_separated_terminated_impl<
     Accum,
     FoldErr,
 >(
-    mut parser: impl Parser<Input, ParseOutput, ParseErr>,
-    mut separator: impl Parser<Input, SepOutput, ParseErr>,
-    mut terminator: impl Parser<Input, TermOutput, ParseErr>,
+    mut parser: impl Parser<I, Output = ParseOutput, Error = ParseErr>,
+    mut separator: impl Parser<I, Output = SepOutput, Error = ParseErr>,
+    mut terminator: impl Parser<I, Output = TermOutput, Error = ParseErr>,
 
     mut init: impl FnMut() -> Accum,
     mut fold: impl FnMut(Accum, ParseOutput) -> Result<Accum, FoldErr>,
 
-    mut build_error: impl FnMut(Input, FoldErr) -> ParseErr,
-) -> impl Parser<Input, Accum, ParseErr>
+    mut build_error: impl FnMut(I, FoldErr) -> ParseErr,
+) -> impl Parser<I, Output = Accum, Error = ParseErr>
 where
-    Input: Clone + InputLength,
-    ParseErr: ParseError<Input>,
+    I: Clone + Input,
+    ParseErr: ParseError<I>,
 {
-    move |mut input: Input| {
+    move |mut input: I| {
         let mut accum = init();
 
         let mut zero_length_state = ZeroLengthParseState::None;
