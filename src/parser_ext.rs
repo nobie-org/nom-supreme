@@ -123,21 +123,12 @@ where
     /// ```
     #[inline]
     #[must_use = "Parsers do nothing unless used"]
-    fn complete(mut self) -> impl FnMut(I) -> nom::IResult<I, O, E>
+    fn complete(self) -> impl Parser<I, Output = O, Error = E>
     where
         I: Clone,
         E: ParseError<I>,
     {
-        move |input: I| {
-            self.parse(input.clone()).map_err(move |err| match err {
-                NomErr::Incomplete(..) => {
-                    // TODO: should this error be reported at the very end
-                    // of the input? Since the error occurred at the eof?
-                    NomErr::Error(E::from_error_kind(input, NomErrorKind::Complete))
-                }
-                err => err,
-            })
-        }
+        nom::combinator::complete(self)
     }
 
     /**
