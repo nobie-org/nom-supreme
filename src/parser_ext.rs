@@ -140,6 +140,61 @@ where
         }
     }
 
+    /**
+    Create a parser that transforms `Error` into `Failure`. This will
+    end the parse immediately, even if there are other branches that
+    could occur.
+    # Example
+    ```rust
+    use cool_asserts::assert_matches;
+    # use nom::{Err, Parser};
+    # use nom::error::{Error, ErrorKind};
+    use nom::branch::alt;
+    use nom::character::complete::char;
+    use nom_supreme::parser_ext::ParserExt;
+    use nom_supreme::tag::complete::tag;
+    use nom_supreme::error::{ErrorTree, BaseErrorKind, Expectation};
+    let mut parser = alt((
+        tag("Hello").terminated(char(']')).cut().preceded_by(char('[')),
+        tag("World").terminated(char(')')).cut().preceded_by(char('(')),
+    ));
+    assert_matches!(parser.parse("[Hello]"), Ok(("", "Hello")));
+    assert_matches!(parser.parse("(World)"), Ok(("", "World")));
+    let branches = assert_matches!(
+        parser.parse("ABC"),
+        Err(Err::Error(ErrorTree::Alt(branches))) => branches
+    );
+    assert_matches!(
+        branches.as_slice(),
+        [
+            ErrorTree::Base {
+                kind: BaseErrorKind::Expected(Expectation::Char('[')),
+                location: "ABC",
+            },
+            ErrorTree::Base {
+                kind: BaseErrorKind::Expected(Expectation::Char('(')),
+                location: "ABC",
+            },
+        ]
+    );
+    // Notice in this example that there's no error for [Hello]. The cut after
+    // [ prevented the other branch from being attempted, and prevented earlier
+    // errors from being retained
+    assert_matches!(
+        parser.parse("(Hello)"),
+        Err(Err::Failure(ErrorTree::Base {
+            kind: BaseErrorKind::Expected(Expectation::Tag("World")),
+            location: "Hello)",
+        }))
+    );
+    ```
+    */
+    #[inline]
+    #[must_use = "Parsers do nothing unless used"]
+    fn cut(self) -> impl Parser<I, Output = O, Error = E> {
+        nom::combinator::cut(self)
+    }
+
     /// Create a parser that applies a mapping function `func` to the output
     /// of the subparser. Any errors from `func` will be transformed into
     /// parse failures via [`FromExternalError`]. This will
